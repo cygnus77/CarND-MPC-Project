@@ -12,6 +12,8 @@
 // for convenience
 using json = nlohmann::json;
 
+extern size_t N;
+
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
@@ -92,6 +94,8 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
+          // Adjust px, py, psi to 100ms later
+
           /*
           * TODO: Calculate steeering angle and throttle using MPC.
           *
@@ -143,15 +147,14 @@ int main() {
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals;
-          vector<double> mpc_y_vals;
+          vector<double> mpc_x_vals(vals.begin()+2, vals.begin()+2+N-1);
+          vector<double> mpc_y_vals(vals.begin()+2+N-1, vals.begin()+2+2*(N-1));
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
 
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
-
 
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
