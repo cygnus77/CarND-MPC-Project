@@ -98,15 +98,6 @@ int main() {
           double steer_value = j[1]["steering_angle"];
           double throttle_value = j[1]["throttle"];
 
-          // Calculate state after 100ms later (map-space)
-          double latency_sec = latency_ms / 1000.0;
-          double delta = -steer_value;
-          double npx = px + v * cos(psi) * latency_sec;
-          double npy = py + v * sin(psi) * latency_sec;
-          double npsi = psi + v * (delta / Lf) * latency_sec;
-          double nv = v + throttle_value * latency_sec;
-
-
           /*
           * TODO: Calculate steeering angle and throttle using MPC.
           *
@@ -119,9 +110,12 @@ int main() {
           vector<double> next_x_vals;
           vector<double> next_y_vals;
 
+          // way points converted to vehicle space
           for(int idx = 0; idx < ptsx.size(); idx++) {
+            // translation
             double ptx = ptsx[idx] - px;
             double pty = ptsy[idx] - py;
+            // rotation
             wp_x[idx] = ptx * cos(psi) + pty * sin(psi);
             wp_y[idx] = pty * cos(psi) - ptx * sin(psi);
             //std::cout << wp_x[idx] << ", " << wp_y[idx] << std::endl;
@@ -129,9 +123,20 @@ int main() {
             next_y_vals.push_back(wp_y[idx]);
           }
 
-          double x=npx-px,y=npy-py; // state of vehicle, converted to vehicle space
-          psi=npsi-psi;
+          // Calculate state after 100ms later (map-space)
+          double latency_sec = latency_ms / 1000.0;
+          double delta = -steer_value;
+          double npx = px + v * cos(psi) * latency_sec;
+          double npy = py + v * sin(psi) * latency_sec;
+          double npsi = psi + v * (delta / Lf) * latency_sec;
+          double nv = v + throttle_value * latency_sec;
+
+          // state of vehicle, converted to vehicle space
+          double xd = npx-px, yd = npy-py; // translation
+          double x = xd * cos(psi) + yd * sin(psi);  // rotation
+          double y = yd * cos(psi) - xd * sin(psi);
           v = nv;
+          psi = npsi-psi;
 
           Eigen::VectorXd coeffs = polyfit(wp_x, wp_y, 3);
 
