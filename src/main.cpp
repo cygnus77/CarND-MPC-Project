@@ -98,8 +98,43 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          double steer_value;
-          double throttle_value;
+          Eigen::VectorXd wp_x(ptsx.size()), wp_y(ptsy.size());
+
+          //Display the waypoints/reference line
+          vector<double> next_x_vals;
+          vector<double> next_y_vals;
+
+          for(int idx = 0; idx < ptsx.size(); idx++) {
+            double ptx = ptsx[idx] - px;
+            double pty = ptsy[idx] - py;
+            wp_x[idx] = ptx * cos(psi) + pty * sin(psi);
+            wp_y[idx] = pty * cos(psi) - ptx * sin(psi);
+            //std::cout << wp_x[idx] << ", " << wp_y[idx] << std::endl;
+            next_x_vals.push_back(wp_x[idx]);
+            next_y_vals.push_back(wp_y[idx]);
+          }
+
+          double x=0,y=0;
+          psi=0;
+
+          Eigen::VectorXd coeffs = polyfit(wp_x, wp_y, 3);
+
+          Eigen::VectorXd state(6);
+          double cte = polyeval(coeffs, x) - y;
+          // derivative of c0 + c1x + c2x^2 + c3x^3 => c1+2c2x+3c3x^2
+          // but x is 0,
+          double epsi = -atan(coeffs[1]);// + 2*coeffs[2]*x + 3*coeffs[3]*x*x);
+          //std::cout << "x:" << x << ", y:" << y << ", psi:" << psi << ", v:" << v << ", cte:" << cte << ", epsi:" << epsi << std::endl;
+          state << x, y, psi, v, cte, epsi;
+          //std::cout << "calling mpc.Solve" << std::endl;
+          vector<double> vals = mpc.Solve(state, coeffs);
+
+          //std:: cout << "solved: " << vals.size() << std::endl;
+
+          double steer_value = -vals[0] / deg2rad(25);
+          double throttle_value = vals[1];
+
+          std::cout << "Steering: " << steer_value << ", throttle: " << throttle_value << std::endl;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -117,9 +152,7 @@ int main() {
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
 
-          //Display the waypoints/reference line
-          vector<double> next_x_vals;
-          vector<double> next_y_vals;
+
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
