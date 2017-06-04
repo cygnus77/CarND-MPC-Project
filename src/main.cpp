@@ -13,6 +13,8 @@
 using json = nlohmann::json;
 
 extern size_t N;
+extern double Lf;
+const int latency_ms = 100;
 
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
@@ -93,8 +95,19 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+          double steer_value = j[1]["steering_angle"];
+          double throttle_value = j[1]["throttle"];
 
           // Adjust px, py, psi to 100ms later
+          // double npx = px + v * cos(psi) * (latency_ms / 1000.0);
+          // double npy = py + v * sin(psi) * (latency_ms / 1000.0);
+          // double npsi = psi + v * (steer_value / Lf) * (latency_ms / 1000.0);
+          // double nv = v + throttle_value * (latency_ms / 1000.0);
+
+          // px = npx;
+          // py = npy;
+          // psi = npsi;
+          // v = nv;
 
           /*
           * TODO: Calculate steeering angle and throttle using MPC.
@@ -118,7 +131,7 @@ int main() {
             next_y_vals.push_back(wp_y[idx]);
           }
 
-          double x=0,y=0;
+          double x= 0,y=0;
           psi=0;
 
           Eigen::VectorXd coeffs = polyfit(wp_x, wp_y, 3);
@@ -127,7 +140,7 @@ int main() {
           double cte = polyeval(coeffs, x) - y;
           // derivative of c0 + c1x + c2x^2 + c3x^3 => c1+2c2x+3c3x^2
           // but x is 0,
-          double epsi = -atan(coeffs[1]);// + 2*coeffs[2]*x + 3*coeffs[3]*x*x);
+          double epsi = psi-atan(coeffs[1] + 2*coeffs[2]*x + 3*coeffs[3]*x*x);
           //std::cout << "x:" << x << ", y:" << y << ", psi:" << psi << ", v:" << v << ", cte:" << cte << ", epsi:" << epsi << std::endl;
           state << x, y, psi, v, cte, epsi;
           //std::cout << "calling mpc.Solve" << std::endl;
@@ -135,8 +148,8 @@ int main() {
 
           //std:: cout << "solved: " << vals.size() << std::endl;
 
-          double steer_value = -vals[0] / deg2rad(25);
-          double throttle_value = vals[1];
+          steer_value = -vals[0] / deg2rad(25);
+          throttle_value = vals[1];
 
           std::cout << "Steering: " << steer_value << ", throttle: " << throttle_value << std::endl;
 
@@ -147,8 +160,8 @@ int main() {
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals(vals.begin()+2, vals.begin()+2+N-1);
-          vector<double> mpc_y_vals(vals.begin()+2+N-1, vals.begin()+2+2*(N-1));
+          vector<double> mpc_x_vals;
+          vector<double> mpc_y_vals;
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
@@ -175,7 +188,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(100));
+          this_thread::sleep_for(chrono::milliseconds(latency_ms));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
