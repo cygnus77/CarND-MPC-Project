@@ -98,16 +98,14 @@ int main() {
           double steer_value = j[1]["steering_angle"];
           double throttle_value = j[1]["throttle"];
 
-          // Adjust px, py, psi to 100ms later
-          // double npx = px + v * cos(psi) * (latency_ms / 1000.0);
-          // double npy = py + v * sin(psi) * (latency_ms / 1000.0);
-          // double npsi = psi + v * (steer_value / Lf) * (latency_ms / 1000.0);
-          // double nv = v + throttle_value * (latency_ms / 1000.0);
+          // Calculate state after 100ms later (map-space)
+          double latency_sec = latency_ms / 1000.0;
+          double delta = -steer_value;
+          double npx = px + v * cos(psi) * latency_sec;
+          double npy = py + v * sin(psi) * latency_sec;
+          double npsi = psi + v * (delta / Lf) * latency_sec;
+          double nv = v + throttle_value * latency_sec;
 
-          // px = npx;
-          // py = npy;
-          // psi = npsi;
-          // v = nv;
 
           /*
           * TODO: Calculate steeering angle and throttle using MPC.
@@ -131,15 +129,15 @@ int main() {
             next_y_vals.push_back(wp_y[idx]);
           }
 
-          double x= 0,y=0;
-          psi=0;
+          double x=npx-px,y=npy-py; // state of vehicle, converted to vehicle space
+          psi=npsi-psi;
+          v = nv;
 
           Eigen::VectorXd coeffs = polyfit(wp_x, wp_y, 3);
 
           Eigen::VectorXd state(6);
           double cte = polyeval(coeffs, x) - y;
           // derivative of c0 + c1x + c2x^2 + c3x^3 => c1+2c2x+3c3x^2
-          // but x is 0,
           double epsi = psi-atan(coeffs[1] + 2*coeffs[2]*x + 3*coeffs[3]*x*x);
           //std::cout << "x:" << x << ", y:" << y << ", psi:" << psi << ", v:" << v << ", cte:" << cte << ", epsi:" << epsi << std::endl;
           state << x, y, psi, v, cte, epsi;
@@ -160,8 +158,12 @@ int main() {
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals;
-          vector<double> mpc_y_vals;
+          vector<double> mpc_x_vals(vals.begin()+2, vals.begin()+2+N);
+          vector<double> mpc_y_vals(vals.begin()+2+N, vals.end());
+          // for(int i = 0; i < mpc_y_vals.size(); i++) {
+          //   mpc_x_vals[i] = mpc_x_vals[i]-(npx-px);
+          //   mpc_y_vals[i] = mpc_y_vals[i]-(npy-py);
+          // }
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
