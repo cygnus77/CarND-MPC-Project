@@ -143,7 +143,7 @@ int main() {
           Eigen::VectorXd state(6);
           double cte = polyeval(coeffs, x) - y;
           // derivative of c0 + c1x + c2x^2 + c3x^3 => c1+2c2x+3c3x^2
-          double epsi = psi-atan(coeffs[1] + 2*coeffs[2]*x + 3*coeffs[3]*x*x);
+          double epsi = psi - atan(coeffs[1] + 2*coeffs[2]*x + 3*coeffs[3]*x*x);
           //std::cout << "x:" << x << ", y:" << y << ", psi:" << psi << ", v:" << v << ", cte:" << cte << ", epsi:" << epsi << std::endl;
           state << x, y, psi, v, cte, epsi;
           //std::cout << "calling mpc.Solve" << std::endl;
