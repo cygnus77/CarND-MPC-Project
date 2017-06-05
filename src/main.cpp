@@ -81,7 +81,7 @@ int main() {
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
     string sdata = string(data).substr(0, length);
-    cout << sdata << endl;
+    //cout << sdata << endl;
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
       string s = hasData(sdata);
       if (s != "") {
@@ -144,7 +144,7 @@ int main() {
           double cte = polyeval(coeffs, x) - y;
           // derivative of c0 + c1x + c2x^2 + c3x^3 => c1+2c2x+3c3x^2
           double epsi = psi - atan(coeffs[1] + 2*coeffs[2]*x + 3*coeffs[3]*x*x);
-          //std::cout << "x:" << x << ", y:" << y << ", psi:" << psi << ", v:" << v << ", cte:" << cte << ", epsi:" << epsi << std::endl;
+          std::cout << "x:" << x << ", y:" << y << ", psi:" << psi << ", v:" << v << ", cte:" << cte << ", epsi:" << epsi << std::endl;
           state << x, y, psi, v, cte, epsi;
           //std::cout << "calling mpc.Solve" << std::endl;
           vector<double> vals = mpc.Solve(state, coeffs);
@@ -154,7 +154,7 @@ int main() {
           steer_value = -vals[0] / deg2rad(25);
           throttle_value = vals[1];
 
-          std::cout << "Steering: " << steer_value << ", throttle: " << throttle_value << std::endl;
+          //std::cout << "Steering: " << steer_value << ", throttle: " << throttle_value << std::endl;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -165,10 +165,6 @@ int main() {
           //Display the MPC predicted trajectory 
           vector<double> mpc_x_vals(vals.begin()+2, vals.begin()+2+N);
           vector<double> mpc_y_vals(vals.begin()+2+N, vals.end());
-          // for(int i = 0; i < mpc_y_vals.size(); i++) {
-          //   mpc_x_vals[i] = mpc_x_vals[i]-(npx-px);
-          //   mpc_y_vals[i] = mpc_y_vals[i]-(npy-py);
-          // }
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
@@ -185,7 +181,7 @@ int main() {
 
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+          //std::cout << msg << std::endl;
           // Latency
           // The purpose is to mimic real driving conditions where
           // the car does actuate the commands instantly.
