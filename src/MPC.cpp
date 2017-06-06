@@ -5,9 +5,16 @@
 
 using CppAD::AD;
 
-// TODO: Set the timestep length and duration
+// Video of this MPC controller with following constants: 
+//     https://youtu.be/PKcjEsma77M
+// Hits 105mph, breaks on curves,
+// If breaking is taken out, max speed hits 110mph, but unsafe.
+// Set the timestep length and duration
 size_t N = 10;
 double dt = 0.05;
+// Multiplier to restrict large steering value
+double delta_scale = 4000;
+double delta_diff_scale = 8000;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -25,7 +32,7 @@ double Lf = 2.67;
 // The reference velocity is set to 40 mph.
 double ref_cte = 0;
 double ref_epsi = 0;
-double ref_v = 110;
+//double ref_v = 110;
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -42,8 +49,14 @@ size_t a_start = delta_start + N - 1;
 class FG_eval {
  public:
   // Fitted polynomial coefficients
-  Eigen::VectorXd coeffs;
-  FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
+  Eigen::VectorXd coeffs, d_coeffs, d_d_coeffs;
+
+  FG_eval(Eigen::VectorXd coeffs) {
+    // pre-compute derivatives
+    this->coeffs = coeffs;
+    this->d_coeffs = MPC::Derivative(coeffs);
+    this->d_d_coeffs = MPC::Derivative(d_coeffs);
+  }
 
   typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
   void operator()(ADvector& fg, const ADvector& vars) {
@@ -56,6 +69,16 @@ class FG_eval {
     // Any additions to the cost should be added to `fg[0]`.
     fg[0] = 0;
 
+    // Compute curvature at start_x, use that to determine target speed
+    CppAD::AD<double> curvature = abs(pow(1 + MPC::Eval(d_coeffs, vars[x_start]), 1.5) / MPC::Eval(d_d_coeffs, vars[x_start]));
+    CppAD::AD<double> ref_v;
+    if(curvature < 20)
+      ref_v = 70;
+    else if(curvature < 70)
+      ref_v = 90;
+    else
+      ref_v = 110;
+
     // The part of the cost based on the reference state.
     for (int i = 0; i < N; i++) {
       fg[0] += CppAD::pow(vars[cte_start + i] - ref_cte, 2);
@@ -65,21 +88,18 @@ class FG_eval {
 
     // Minimize the use of actuators.
     for (int i = 0; i < N - 1; i++) {
-      fg[0] += 4000*CppAD::pow(vars[delta_start + i], 2);
+      fg[0] += delta_scale*CppAD::pow(vars[delta_start + i], 2);
       fg[0] += CppAD::pow(vars[a_start + i], 2);
     }
 
     // Minimize the value gap between sequential actuations.
     for (int i = 0; i < N - 2; i++) {
-      fg[0] += 8000 * CppAD::pow(vars[delta_start + i + 1] - vars[delta_start + i], 2);
+      // Multiplier to restrict changes in steering
+      fg[0] += delta_diff_scale * CppAD::pow(vars[delta_start + i + 1] - vars[delta_start + i], 2);
       fg[0] += CppAD::pow(vars[a_start + i + 1] - vars[a_start + i], 2);
     }
 
-    //
     // Setup Constraints
-    //
-    // NOTE: In this section you'll setup the model constraints.
-
     // Initial constraints
     //
     // We add 1 to each of the starting indices due to cost being located at
@@ -114,13 +134,10 @@ class FG_eval {
       AD<double> delta0 = vars[delta_start + i];
       AD<double> a0 = vars[a_start + i];
 
-      AD<double> f0 = MPC::Eval(coeffs, x0); //coeffs[0] + coeffs[1] * x0 + coeffs[2] * pow(x0,2) + coeffs[3] * pow(x0, 3);
-      AD<double> psides0 = CppAD::atan(MPC::Eval(MPC::Derivative(coeffs), x0));//coeffs[1] + 2 * coeffs[2] * x0 + 3 * coeffs[3] * pow(x0,2));
+      AD<double> f0 = MPC::Eval(coeffs, x0);
+      AD<double> psides0 = CppAD::atan(MPC::Eval(d_coeffs, x0));
 
-      // Here's `x` to get you started.
-      // The idea here is to constraint this value to be 0.
-      //
-      // Recall the equations for the model:
+
       // x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
       // y_[t+1] = y[t] + v[t] * sin(psi[t]) * dt
       // psi_[t+1] = psi[t] + v[t] / Lf * delta[t] * dt
@@ -136,25 +153,6 @@ class FG_eval {
     }
   }
 };
-
-Eigen::VectorXd MPC::Derivative(const Eigen::VectorXd& coeffs)
-{
-  Eigen::VectorXd result(coeffs.rows()-1);
-  for(int i = 1; i < coeffs.rows(); i++) {
-    result[i-1] = i * coeffs[i];
-  }
-  return result;
-}
-
-template <typename T>
-T MPC::Eval(const Eigen::VectorXd& coeffs, T& x)
-{
-  T result = 0;
-  for(int i = 0 ; i < coeffs.rows(); i++) {
-    result += (coeffs[i] * pow(x, i));
-  }
-  return result;
-}
 
 //
 // MPC class definition implementation.
@@ -175,7 +173,7 @@ vector<double> MPC::Solve(Eigen::VectorXd x0, Eigen::VectorXd coeffs) {
   double epsi = x0[5];
 
   // number of independent variables
-      // N timesteps == N - 1 actuations
+  // N timesteps ==> N - 1 actuations
   size_t n_vars = N * 6 + (N - 1) * 2;
   // Number of constraints
   size_t n_constraints = N * 6;
@@ -207,14 +205,12 @@ vector<double> MPC::Solve(Eigen::VectorXd x0, Eigen::VectorXd coeffs) {
 
   // The upper and lower limits of delta are set to -25 and 25
   // degrees (values in radians).
-  // NOTE: Feel free to change this to something else.
   for (int i = delta_start; i < a_start; i++) {
     vars_lowerbound[i] = -0.436332;
     vars_upperbound[i] = 0.436332;
   }
 
   // Acceleration/decceleration upper and lower limits.
-  // NOTE: Feel free to change this to something else.
   for (int i = a_start; i < n_vars; i++) {
     vars_lowerbound[i] = -1.0;
     vars_upperbound[i] = 1.0;

@@ -14,7 +14,6 @@ using json = nlohmann::json;
 
 extern size_t N;
 extern double Lf;
-const int latency_ms = 100;
 
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
@@ -34,15 +33,6 @@ string hasData(string s) {
     return s.substr(b1, b2 - b1 + 2);
   }
   return "";
-}
-
-// Evaluate a polynomial.
-double polyeval(Eigen::VectorXd coeffs, double x) {
-  double result = 0.0;
-  for (int i = 0; i < coeffs.size(); i++) {
-    result += coeffs[i] * pow(x, i);
-  }
-  return result;
 }
 
 // Fit a polynomial.
@@ -99,7 +89,7 @@ int main() {
           double throttle_value = j[1]["throttle"];
 
           /*
-          * TODO: Calculate steeering angle and throttle using MPC.
+          * Calculate steeering angle and throttle using MPC.
           *
           * Both are in between [-1, 1].
           *
@@ -110,7 +100,7 @@ int main() {
           vector<double> next_x_vals;
           vector<double> next_y_vals;
 
-          // way points converted to vehicle space
+          // Convert way-points to vehicle space
           for(int idx = 0; idx < ptsx.size(); idx++) {
             // translation
             double ptx = ptsx[idx] - px;
@@ -118,43 +108,45 @@ int main() {
             // rotation
             wp_x[idx] = ptx * cos(psi) + pty * sin(psi);
             wp_y[idx] = pty * cos(psi) - ptx * sin(psi);
-            //std::cout << wp_x[idx] << ", " << wp_y[idx] << std::endl;
+            
             next_x_vals.push_back(wp_x[idx]);
             next_y_vals.push_back(wp_y[idx]);
           }
 
-          // Calculate state after 100ms later (map-space)
-          double latency_sec = latency_ms / 1000.0;
+          // Calculate vehicle state after 100ms later (in map-space)
+          double latency_sec = 100 / 1000.0;
           double delta = -steer_value;
           double npx = px + v * cos(psi) * latency_sec;
           double npy = py + v * sin(psi) * latency_sec;
           double npsi = psi + v * (delta / Lf) * latency_sec;
           double nv = v + throttle_value * latency_sec;
 
-          // state of vehicle, converted to vehicle space
+          // Convert state of vehicle to vehicle space
           double xd = npx-px, yd = npy-py; // translation
           double x = xd * cos(psi) + yd * sin(psi);  // rotation
           double y = yd * cos(psi) - xd * sin(psi);
           v = nv;
           psi = npsi-psi;
 
+          // Fit a cubic polynomial to the way points
           Eigen::VectorXd coeffs = polyfit(wp_x, wp_y, 3);
 
+          // Calculate error values for the state
           Eigen::VectorXd state(6);
-          double cte = polyeval(coeffs, x) - y;
-          // derivative of c0 + c1x + c2x^2 + c3x^3 => c1+2c2x+3c3x^2
-          double epsi = psi - atan(coeffs[1] + 2*coeffs[2]*x + 3*coeffs[3]*x*x);
-          std::cout << "x:" << x << ", y:" << y << ", psi:" << psi << ", v:" << v << ", cte:" << cte << ", epsi:" << epsi << std::endl;
+          // Cross-track error
+          double cte = MPC::Eval(coeffs, x) - y;
+          // Orientation error (difference between target slope at x and current orientation)
+          double epsi = psi - atan(MPC::Eval(MPC::Derivative(coeffs), x));
+
+          //std::cout << "x:" << x << ", y:" << y << ", psi:" << psi << ", v:" << v << ", cte:" << cte << ", epsi:" << epsi << std::endl;
           state << x, y, psi, v, cte, epsi;
-          //std::cout << "calling mpc.Solve" << std::endl;
+
           vector<double> vals = mpc.Solve(state, coeffs);
 
-          //std:: cout << "solved: " << vals.size() << std::endl;
-
+          // Convert steering value to unity's units
           steer_value = -vals[0] / deg2rad(25);
           throttle_value = vals[1];
 
-          //std::cout << "Steering: " << steer_value << ", throttle: " << throttle_value << std::endl;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -191,7 +183,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(latency_ms));
+          this_thread::sleep_for(chrono::milliseconds(100));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
