@@ -15,6 +15,12 @@ class MPC {
   // Solve the model given an initial state and polynomial coefficients.
   // Return the first actuatotions.
   vector<double> Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs);
+
+  static Eigen::VectorXd Derivative(const Eigen::VectorXd& coeffs);
+
+  template <typename T>
+  static T Eval(const Eigen::VectorXd& coeffs, T& x);
+
 };
 
 #endif /* MPC_H */

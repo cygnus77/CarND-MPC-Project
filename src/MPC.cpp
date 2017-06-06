@@ -114,8 +114,8 @@ class FG_eval {
       AD<double> delta0 = vars[delta_start + i];
       AD<double> a0 = vars[a_start + i];
 
-      AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * pow(x0,2) + coeffs[3] * pow(x0, 3);
-      AD<double> psides0 = CppAD::atan(coeffs[1] + 2 * coeffs[2] * x0 + 3 * coeffs[3] * pow(x0,2));
+      AD<double> f0 = MPC::Eval(coeffs, x0); //coeffs[0] + coeffs[1] * x0 + coeffs[2] * pow(x0,2) + coeffs[3] * pow(x0, 3);
+      AD<double> psides0 = CppAD::atan(MPC::Eval(MPC::Derivative(coeffs), x0));//coeffs[1] + 2 * coeffs[2] * x0 + 3 * coeffs[3] * pow(x0,2));
 
       // Here's `x` to get you started.
       // The idea here is to constraint this value to be 0.
@@ -136,6 +136,25 @@ class FG_eval {
     }
   }
 };
+
+Eigen::VectorXd MPC::Derivative(const Eigen::VectorXd& coeffs)
+{
+  Eigen::VectorXd result(coeffs.rows()-1);
+  for(int i = 1; i < coeffs.rows(); i++) {
+    result[i-1] = i * coeffs[i];
+  }
+  return result;
+}
+
+template <typename T>
+T MPC::Eval(const Eigen::VectorXd& coeffs, T& x)
+{
+  T result = 0;
+  for(int i = 0 ; i < coeffs.rows(); i++) {
+    result += (coeffs[i] * pow(x, i));
+  }
+  return result;
+}
 
 //
 // MPC class definition implementation.
