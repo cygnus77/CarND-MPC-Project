@@ -7,12 +7,13 @@ Self-Driving Car Engineer Nanodegree Program
 
 [You tube video](https://youtu.be/PKcjEsma77M)
 
-### Note:
+#### Note:
 
 * Hits 105mph while breaking on sharp curves.
 * If breaking is taken out, max speed hits 110mph, but unsafe.
 
 
+---
 
 
 ## Dependencies
