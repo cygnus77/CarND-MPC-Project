@@ -23,22 +23,20 @@ Kinematic model is used to predict vehicle motion using the following formulae:
 
 ### Timestep Length and Elapsed Duration (N & dt)
 
-MPC predicts the vehicle trajectory for N timesteps, each dt seconds apart. MPC optimizer selectes actuator values that minimizes the error between predicted trajectory and desired trajectory over the N timesteps.
+MPC predicts the vehicle trajectory for `N` timesteps, each `dt` seconds apart. MPC optimizer selectes actuator values that minimizes the error between predicted trajectory and desired trajectory over the N timesteps.
 
-Since at each iteration, we only select the first actuator values, computing a very large trajectory (N > 20) is wasteful.
-
-However too short a trajectory might miss planning for a sharp curve that the car is just about to encounter.
+Since at each iteration, we only select the first set of actuator values, computing a very large trajectory (N > 20) is wasteful. However too short a trajectory might miss planning for a sharp curve that the car is just about to encounter.
 
 Likewise, a short value of dt will effetively reduce the trajectory length, whereas a very large dt value will prevent the car from reacting to changes quickly.
 
 At faster speeds, dt value has to be smaller, as the trajectory will grow longer because of more ground being covered in a shorter time span.
 
-I set a target speed of more than 80mph and after a few trials, I selected N = 10 and dt = 0.05.
+I set a target speed of more than 80mph and after some experimentation, I selected N = 10 and dt = 0.05.
 
 
 ### Polynomial Fitting and MPC Preprocessing
 
-Converting coordinates, angles into a coordinate space relative to the vehicle's current position and angle, called `Vehicle Coordinate Space` makes calculations much easier. 
+Since the simulator provides waypoints instead of a polynomial (as a path-planning module would), we would have to compute one. The first step is to convert coordinates and angles into a uniform coordinate space that is relative to the vehicle's current position and angle, called `Vehicle Coordinate Space`.
 
 Waypoints are converted to vehicle space by tranlating them to vehicle origin and rotating them to vehicle's orientation.
 Then we fit a 3rd degree polynomial to the waypoints and obtain a set of coefficients that describe it. This polynomial describes the path the car should aim to be on.
@@ -69,9 +67,16 @@ A `Cost` function is defined to compute the cost of a given state `[x, y, ψ, v,
 - Penalize large actuator values (δ and a)
 - Penalize large changes to actuators (δ_(t+1) − δ_t  & a_(t+1) − a_t)
 
-A `Solve` function We use the IPOPT (Interior Point OPTimizer) package to find the set of actuator values that minimizes the cost while keeping within defined constraints.
+I had to scale up (by a factor of 1000) the cost of large steering actuator values to ensure stability at higher speeds.
 
-The solve function computes the cost for the N steps in the trajectory at each timestep dt.
+Further, I set the target speed of the car based on the curvature of the projected trajectory. Sharper the curve, slower the car would drive; straighter the trajectory, faster the car would attempt to go.
+
+A `Solve` function uses the IPOPT (Interior Point OPTimizer) package to find the set of actuator values that minimizes the cost while keeping within defined constraints.
+
+The solve function computes the cost for the N steps in the trajectory at each timestep dt, by invoking the cost function multiple times.
+
+Finally, the best actuator values are converted back to ranges accepted by the simulator and returned as telemetry output.
+
 
 ### Video of this MPC controller is posted here 
 
