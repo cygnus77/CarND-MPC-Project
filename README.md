@@ -13,37 +13,41 @@ The goal is to maximize speed while keeping vehicle safe and close to the intend
 ### The Model
 
 The state of the vehicle is represented by coordinates: x, y, orientation: ψ and velocity: v.
-Kinematic model is used to predict vehicle motion using the following formulae:
-x_(t+1) = x + v * cos⁡(ψ) * dt
-y_(t+1) = y + v * sin⁡(ψ) * dt
-ψ_(t+1) = ψ + v/L_f * δ * dt
-v_(t+1) = v + a * dt
 
+Kinematic model is used to predict vehicle motion using the following formulae:
+
+- x_(t+1) = x + v * cos⁡(ψ) * dt
+- y_(t+1) = y + v * sin⁡(ψ) * dt
+- ψ_(t+1) = ψ + v/L_f * δ * dt
+- v_(t+1) = v + a * dt
 
 ### Timestep Length and Elapsed Duration (N & dt)
 
 
 ### Polynomial Fitting and MPC Preprocessing
 
-Vechicle coordinate space origin is at the vehicle's current location.
+Converting coordinates, angles into a coordinate space relative to the vehicle's current position and angle, called `Vehicle Coordinate Space` makes calculations much easier. 
+
 Waypoints are converted to vehicle space by tranlating them to vehicle origin and rotating them to vehicle's orientation.
+Then we fit a 3rd degree polynomial to the waypoints and obtain a set of coefficients that describe it. This polynomial describes the path the car should aim to be on.
 
-Predict the vehicle location on the map after 100ms (using current throttle, orientation and steering angle) and use that location as the starting point for planning the next action.
-Convert this map location to vehicle space.
-
-Then we fit a 3rd degree polynomial to the waypoints and obtain a set of coefficients that describe it.
+Next, we predict the vehicle's location on the map after 100ms using kinematic model equations and values of current throttle, orientation and steering angle. This location is converted to vehicle space and used as the starting point for planning the next action.
 
 #### CTE
 Based on the polynomial, we can calculate the cross-track error of the current position. To do that, we evaluate the polynomial at the car's current x coordinate, obtaining the expexceted y coordinate value. The difference between expected y and actual y is a measure of the CTE.
-$cte_t = f(x_t) − y_t$
+
+- cte_t = f(x_t) − y_t
 
 #### Orientation error
+
 Error in vehicle orientation is calculated by comparing the slope of the polynomial (computed using the derivative of the polynomial) at x and the current orientation:
-eψ_t= ψ_t − ψdes_t
-eψ_(t+1) = eψ + v_t/L_f * δ_t * dt
+
+- eψ_t= ψ_t − ψdes_t
+- eψ_(t+1) = eψ + v_t/L_f * δ_t * dt
 
 The CTE and orientation error complete the state of the vehicle used in solving process:
-State of vehicle: [x, y, ψ, v, cte, eψ]
+
+State of vehicle: `[x, y, ψ, v, cte, eψ]`
 
 ### Cost function
 
