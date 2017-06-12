@@ -21,6 +21,12 @@ Kinematic model is used to predict vehicle motion using the following formulae:
 - ψ_(t+1) = ψ + v/L_f * δ * dt
 - v_(t+1) = v + a * dt
 
+Where
+- δ: steering angle
+- a: accelaration (throttle)
+- dt: time step length in seconds
+- L_f: distance from front of vehicle to center-of-gravity (constant provided for the vehicle)
+
 ### Timestep Length and Elapsed Duration (N & dt)
 
 MPC predicts the vehicle trajectory for `N` timesteps, each `dt` seconds apart. MPC optimizer selectes actuator values that minimizes the error between predicted trajectory and desired trajectory over the N timesteps.
@@ -43,12 +49,12 @@ Then we fit a 3rd degree polynomial to the waypoints and obtain a set of coeffic
 
 Next, we predict the vehicle's location on the map after 100ms using kinematic model equations and values of current throttle, orientation and steering angle. This location is converted to vehicle space and used as the starting point for planning the next action.
 
-#### CTE
+#### CTE (`cte`)
 Based on the polynomial, we can calculate the cross-track error of the current position. To do that, we evaluate the polynomial at the car's current x coordinate, obtaining the expexceted y coordinate value. The difference between expected y and actual y is a measure of the CTE.
 
 - cte_t = f(x_t) − y_t
 
-#### Orientation error
+#### Orientation error (`eψ`)
 
 Error in vehicle orientation is calculated by comparing the slope of the polynomial (computed using the derivative of the polynomial) at x and the current orientation:
 
